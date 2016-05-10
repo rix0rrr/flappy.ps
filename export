@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+cpp -P $1 _output.ps
+time gs -dNOPAUSE -dBATCH -sOutputFile=export.pdf -sDEVICE=pdfwrite -dAutoRotatePages=/Portrait _output.ps
+open export.pdf

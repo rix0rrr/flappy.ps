@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+cpp -P $1 _output.ps
+#gs -dNOPAUSE _output.ps 
+gs _output.ps 

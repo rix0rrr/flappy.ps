@@ -1,0 +1,265 @@
+%!PS-Adobe-3.0
+%%LanguageLevel: 2
+
+% GAME DEFINITION
+%
+% What level are we in, and at what frame numbers are we jumping?
+/level 3582 def
+/jumps [
+    30 35
+] def
+
+% Im using the C preprocessor here to separate out large files. My editor
+% starts complaining when I have these files with 40k lines in here.
+%
+% They define commands that draw an image with the same name as the file.
+#include "background.eps"
+%#include "flappy_bitmap.eps"
+#include "flappy_vector.eps"
+#include "pipe_top.eps"
+#include "pipe.eps"
+
+% A4 paper, but in landscape mode
+/page_w 842 def
+/page_h 595 def
+
+% preparepage
+% Set up the current page in landscape mode, and set up the CTM so that
+% the bottom left is still (0, 0)
+/preparepage {
+    << /PageSize [page_h page_w] >> setpagedevice 
+    <</Orientation 3>> setpagedevice
+
+    90 rotate
+    0 page_h neg translate
+} def
+
+
+% hscroll drawbackground
+/drawbackground {
+gsave
+    neg background_w mod -120 translate
+    background
+    background_w 18 sub 0 translate
+    background
+    background_w 18 sub 0 translate
+    background
+grestore
+} def
+
+% speed height drawflappy
+/drawflappy {
+gsave
+    % Important: translate before rotate
+    0 exch translate 
+    0 ge { 20 rotate } { -20 rotate} ifelse
+    0.5 0.5 scale
+    flappy
+    0 setgray
+grestore
+} def
+
+% drawhalfpipe
+/drawhalfpipe {
+    % Bottom
+    gsave
+        0 hole_hheight neg translate
+        % Scale the pipe out "a whole lot". It will stick out of the page but we
+        % do not care.
+        gsave 1 100 scale pipe grestore
+        pipe_top
+    grestore
+} def
+
+% hole_height drawpipe
+/drawpipe {
+    gsave 
+        % Move the center of the hole to (0, 0)
+        0 exch translate
+        
+        % Top
+        % COOLNESS NOTE: I flip the coordinate system and call the same function
+        % twice.
+        gsave
+            1 -1 scale
+            drawhalfpipe
+        grestore
+
+        drawhalfpipe
+    grestore
+} def
+
+% hscroll drawpipes
+/drawpipes {
+gsave
+    neg 0 translate
+    pipes {
+        pipe_distance 0 translate
+        drawpipe
+    } forall
+grestore
+} def
+
+% text x y withdropshadow
+/withdropshadow {
+    3 copy
+
+    page_h exch sub moveto
+    true charpath
+    0.5 0 0 setrgbcolor
+    fill
+
+    exch 2 sub
+    exch 2 sub
+
+    page_h exch sub moveto
+    true charpath
+    1 1 0 setrgbcolor
+    fill
+} def
+
+% drawlogo
+% Draw logo at the top of the screen
+/drawlogo {
+gsave
+    /AvantGarde-Demi findfont
+    50 scalefont
+    setfont
+    (flappy.ps) 300 60 withdropshadow
+grestore
+} def
+
+
+% x y max
+%/max {
+    %2 copy
+    %le { exch } if
+    %pop
+%} def
+
+% h_position drawscore
+/drawscore {
+gsave
+    page_w 100 sub page_h 45 sub translate
+
+    pipe_distance idiv
+
+    /AvantGarde-Demi findfont
+    100 3 index pipe_distance 1 sub max pipe_distance mod sub
+    0.2 mul
+    0 max
+    50 add
+    scalefont
+    setfont
+
+    5 string cvs 
+
+    0 0 moveto
+    dup true charpath flattenpath pathbbox
+    newpath
+    % llx lly urx ury
+    3 -1 roll
+    % llx urx ury lly
+    sub neg 2 div
+    % llx urx dy
+    3 1 roll sub neg 2 div
+    exch moveto
+    true charpath
+    0.9 0.99 0.82 setrgbcolor
+    fill
+grestore
+} def
+
+% height h_position
+/touches_pipe {
+    abs pipe_hwidth hitmargin add le
+    exch height sub abs hole_hheight hitmargin add gt
+    and
+} def
+
+% h_position touches_any_pipe
+/touches_any_pipe {
+    neg
+    false 
+    pipes { 
+        % h_position false height
+        2 index pipe_distance add
+        % h_position false height next_hposition
+        4 1 roll
+        % next_hposition h_position false height
+        3 index touches_pipe 
+        % next_hposition h_position false true?
+        or 
+        % next_hposition h_position true?
+        exch pop
+    } forall
+} def
+
+% h_position is_dead
+% Return whether flappy hit a pipe or the floor
+/is_dead {
+    touches_any_pipe
+    height horizon le 
+    or
+} def
+
+% Constants
+/gravity 2 def
+/horizon 90 def
+/vjump  25 def
+/hspeed 20 def
+/num_pipes 10 def
+/pipe_distance 400 def
+/flappy_hofs 250 def
+/pipe_width 100 def
+/hole_height 160 def
+/pipe_hwidth pipe_width 2 div def
+/hole_hheight hole_height 2 div def
+/hitmargin 20 def
+
+/height 250 def 
+/vy     vjump def
+/frame  0   def
+/min_pipe_height 50 def
+/pipe_rand_margin page_h 50 sub def
+
+% Generate pipes
+level srand
+/pipes [ 0 1 num_pipes {
+    pop rand pipe_rand_margin mod min_pipe_height add
+} for ] def
+
+% Main loop
+{
+    preparepage
+
+    frame hspeed mul
+    dup dup dup 
+
+    drawbackground
+    
+    % Flappy is at x=0 but showing him a bit to the right looks nicer.
+    % COOLNESS NOTE: Messing with the CTM to achieve this is kewl.
+    gsave
+        flappy_hofs 0 translate
+        drawpipes
+        vy height drawflappy 
+    grestore
+
+    drawlogo
+    drawscore
+
+    % Exit if height <= 0
+    is_dead { exit } if
+
+    % Check if this is a jumpin frame
+    jumps { frame eq { /vy vjump store } if } forall
+
+    % Physics
+    % These would have been cooler if they'd been on the stack. Oh well.
+    /height height vy add store
+    /vy vy gravity sub store
+    /frame frame 1 add store
+
+    showpage
+} loop
