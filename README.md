@@ -13,7 +13,7 @@ threw something fun together for a coding challenge. My PostScript style is
 probably completely crap, so don't try to learn anything from this code, maybe
 other than a curiosity.
 
-![(Short Presentation)](flappy_presentation.pdf?raw=true)
+[(Short Presentation)](flappy_presentation.pdf?raw=true)
 
 ## How to run it
 
